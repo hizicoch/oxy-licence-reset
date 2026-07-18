@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Oxy Licence — Réinitialisation du mot de passe</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0f172a; color: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  form, .box {
+    width: 340px; background: #16213a; border: 1px solid #2a3958; border-radius: 14px;
+    padding: 28px; display: flex; flex-direction: column; gap: 14px;
+  }
+  h1 { font-size: 15px; font-weight: 800; margin: 0; }
+  p.sub { font-size: 10.5px; color: #94a3b8; margin: 4px 0 0; }
+  label { font-size: 11.5px; color: #cbd5e1; font-weight: 600; }
+  input {
+    display: block; width: 100%; margin-top: 5px; padding: 9px 11px;
+    background: #0f172a; border: 1px solid #2a3958; border-radius: 8px;
+    color: #f1f5f9; font-size: 13px; font-family: inherit;
+  }
+  button {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 4px; padding: 10px 12px; border: none; border-radius: 8px;
+    background: #4f8cff; color: #fff; font-weight: 700; font-size: 13px;
+    font-family: inherit; cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .msg { font-size: 11.5px; padding: 7px 10px; border-radius: 7px; }
+  .msg.error { color: #fca5a5; background: #451a1a; }
+  .msg.success { color: #86efac; background: #14291c; }
+  .logo { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    const SUPABASE_URL = "https://gfnjbpnlelsyitsmekuz.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_5Jf3voA2YRz2SiUTipX_ZA_wAwZSgBc";
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { detectSessionInUrl: true, persistSession: false, autoRefreshToken: false },
+    });
+
+    const app = document.getElementById("app");
+
+    function renderForm() {
+      app.innerHTML = `
+        <form id="f">
+          <div>
+            <div class="logo">Oxy Licence</div>
+            <h1>Nouveau mot de passe</h1>
+            <p class="sub">Choisissez un mot de passe pour votre compte admin, puis reconnectez-vous dans l'application.</p>
+          </div>
+          <label>Nouveau mot de passe
+            <input type="password" id="pw" required minlength="8" autofocus />
+          </label>
+          <label>Confirmer le mot de passe
+            <input type="password" id="pw2" required minlength="8" />
+          </label>
+          <div id="msg"></div>
+          <button type="submit" id="btn">Définir le mot de passe</button>
+        </form>
+      `;
+      document.getElementById("f").addEventListener("submit", onSubmit);
+    }
+
+    function renderMessage(kind, text) {
+      app.innerHTML = `<div class="box"><div class="logo">Oxy Licence</div><div class="msg ${kind}">${text}</div></div>`;
+    }
+
+    async function onSubmit(e) {
+      e.preventDefault();
+      const pw = document.getElementById("pw").value;
+      const pw2 = document.getElementById("pw2").value;
+      const msg = document.getElementById("msg");
+      const btn = document.getElementById("btn");
+      msg.innerHTML = "";
+      if (pw.length < 8) { msg.innerHTML = '<div class="msg error">8 caractères minimum.</div>'; return; }
+      if (pw !== pw2) { msg.innerHTML = '<div class="msg error">Les deux mots de passe ne correspondent pas.</div>'; return; }
+      btn.disabled = true;
+      btn.textContent = "…";
+      const { error } = await client.auth.updateUser({ password: pw });
+      btn.disabled = false;
+      btn.textContent = "Définir le mot de passe";
+      if (error) { msg.innerHTML = `<div class="msg error">${error.message}</div>`; return; }
+      renderMessage("success", "Mot de passe mis à jour. Vous pouvez fermer cette page et vous reconnecter dans Oxy Licence avec votre nouveau mot de passe.");
+    }
+
+    (async function init() {
+      const { data } = await client.auth.getSession();
+      if (data.session) {
+        renderForm();
+      } else {
+        renderMessage("error", "Lien de réinitialisation invalide ou expiré. Demandez un nouveau lien depuis l'écran de connexion d'Oxy Licence.");
+      }
+    })();
+  </script>
+</body>
+</html>
