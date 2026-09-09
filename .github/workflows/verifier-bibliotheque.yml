@@ -1,0 +1,89 @@
+name: Vérifier la bibliothèque Supabase
+
+# Cette page est celle où un administrateur saisit son mot de passe, et elle
+# charge sa seule dépendance depuis un CDN. Deux protections en découlent :
+# une version épinglée dans index.html (et non `@2`, qui suivait toute
+# nouvelle 2.x), et un attribut `integrity` que le navigateur vérifie avant
+# d'exécuter le script.
+#
+# Ce workflow est ce qui rend la seconde vraie dans la durée : il retélécharge
+# la version épinglée, recalcule son empreinte, et ÉCHOUE si elle ne
+# correspond plus à celle inscrite dans index.html. Sans lui, l'attribut
+# serait posé une fois et jamais revérifié.
+#
+# Au premier passage, index.html n'a pas encore d'`integrity` : le workflow
+# affiche alors la valeur à y coller, et s'arrête sans erreur.
+on:
+  push:
+  workflow_dispatch: {}
+  schedule:
+    # Une fois par semaine : un CDN qui se met à servir autre chose pour une
+    # version figée est exactement ce qu'on veut apprendre sans attendre le
+    # prochain commit.
+    - cron: "23 4 * * 1"
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Comparer l'empreinte servie et l'empreinte attendue
+        run: |
+          set -euo pipefail
+
+          version=$(grep -oP 'supabase-js@\K[0-9]+\.[0-9]+\.[0-9]+' index.html | head -1)
+          if [ -z "$version" ]; then
+            echo "::error::Aucune version épinglée trouvée dans index.html — la balise script doit porter une version exacte, jamais @2."
+            exit 1
+          fi
+          echo "Version épinglée : $version"
+
+          url="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@${version}/dist/umd/supabase.js"
+          curl -fsSL "$url" -o bibliotheque.js
+          taille=$(wc -c < bibliotheque.js)
+          calculee="sha384-$(openssl dgst -sha384 -binary bibliotheque.js | openssl base64 -A)"
+          echo "Taille servie   : $taille octets"
+          echo "Empreinte servie: $calculee"
+
+          attendue=$(grep -oP 'integrity="\K[^"]+' index.html | head -1 || true)
+
+          {
+            echo "### Bibliothèque Supabase"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version épinglée | \`$version\` |"
+            echo "| Taille servie | $taille octets |"
+            echo "| Empreinte servie | \`$calculee\` |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$attendue" ]; then
+            {
+              echo "⚠️ **Aucun \`integrity\` dans index.html.** Coller la valeur ci-dessus"
+              echo "dans la balise \`<script>\`, puis relancer ce workflow : il vérifiera"
+              echo "alors la correspondance à chaque passage."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::index.html n'a pas encore d'attribut integrity — valeur à coller : $calculee"
+            exit 0
+          fi
+
+          if [ "$attendue" != "$calculee" ]; then
+            {
+              echo "❌ **L'empreinte ne correspond plus.**"
+              echo ""
+              echo "- attendue : \`$attendue\`"
+              echo "- servie   : \`$calculee\`"
+              echo ""
+              echo "Le CDN ne sert plus le même fichier pour une version pourtant figée."
+              echo "Ne pas mettre à jour l'attribut sans avoir compris pourquoi."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Empreinte différente — attendue $attendue, servie $calculee"
+            exit 1
+          fi
+
+          echo "✅ L'empreinte servie correspond à celle inscrite dans index.html." >> "$GITHUB_STEP_SUMMARY"
+          echo "Empreinte conforme."
