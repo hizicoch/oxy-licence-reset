@@ -39,7 +39,18 @@
 <body>
   <div id="app"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <!-- Version EPINGLEE (et non `@2`, qui suivait automatiquement toute
+       nouvelle 2.x). Meme version que le client Oxy Licence, qui parle au
+       meme projet. L'attribut `integrity` fait verifier au navigateur que
+       l'octet recu est bien celui attendu : sur une page ou un
+       administrateur saisit son mot de passe, un bundle altere le lirait en
+       clair. `.github/workflows/verifier-bibliotheque.yml` recalcule cette
+       empreinte et echoue si elle cesse de correspondre. -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7/dist/umd/supabase.js"
+    integrity="sha384-hazsLVND17GNLVdtV19te6qbFT2YuLgl8SamcF+QR5eIOC+W4dGKrUNMxU1jH1zD"
+    crossorigin="anonymous"
+  ></script>
   <script>
     const SUPABASE_URL = "https://gfnjbpnlelsyitsmekuz.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_5Jf3voA2YRz2SiUTipX_ZA_wAwZSgBc";
@@ -70,6 +81,18 @@
       document.getElementById("f").addEventListener("submit", onSubmit);
     }
 
+    /** Affiche un texte venu du serveur SANS l'interpreter comme du HTML.
+     *  `textContent` et non `innerHTML` : sur la page ou un administrateur
+     *  saisit son mot de passe, rien de ce qui vient du reseau ne doit
+     *  pouvoir reecrire le DOM. */
+    function showError(conteneur, texte) {
+      conteneur.innerHTML = "";
+      const boite = document.createElement("div");
+      boite.className = "msg error";
+      boite.textContent = texte;
+      conteneur.appendChild(boite);
+    }
+
     function renderMessage(kind, text) {
       app.innerHTML = `<div class="box"><div class="logo">Oxy Licence</div><div class="msg ${kind}">${text}</div></div>`;
     }
@@ -88,7 +111,7 @@
       const { error } = await client.auth.updateUser({ password: pw });
       btn.disabled = false;
       btn.textContent = "Définir le mot de passe";
-      if (error) { msg.innerHTML = `<div class="msg error">${error.message}</div>`; return; }
+      if (error) { showError(msg, error.message); return; }
       renderMessage("success", "Mot de passe mis à jour. Vous pouvez fermer cette page et vous reconnecter dans Oxy Licence avec votre nouveau mot de passe.");
     }
 
