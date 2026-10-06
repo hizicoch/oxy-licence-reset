@@ -93,8 +93,21 @@
       conteneur.appendChild(boite);
     }
 
+    /** Construit le message final par le DOM, jamais par innerHTML : `text`
+     *  peut venir du reseau, et cette page manipule un mot de passe admin.
+     *  `kind` est restreint a deux valeurs connues plutot qu'interpole dans
+     *  un nom de classe. */
     function renderMessage(kind, text) {
-      app.innerHTML = `<div class="box"><div class="logo">Oxy Licence</div><div class="msg ${kind}">${text}</div></div>`;
+      const boite = document.createElement("div");
+      boite.className = "box";
+      const logo = document.createElement("div");
+      logo.className = "logo";
+      logo.textContent = "Oxy Licence";
+      const message = document.createElement("div");
+      message.className = kind === "success" ? "msg success" : "msg error";
+      message.textContent = text;
+      boite.append(logo, message);
+      app.replaceChildren(boite);
     }
 
     async function onSubmit(e) {
@@ -104,8 +117,8 @@
       const msg = document.getElementById("msg");
       const btn = document.getElementById("btn");
       msg.innerHTML = "";
-      if (pw.length < 8) { msg.innerHTML = '<div class="msg error">8 caractères minimum.</div>'; return; }
-      if (pw !== pw2) { msg.innerHTML = '<div class="msg error">Les deux mots de passe ne correspondent pas.</div>'; return; }
+      if (pw.length < 8) { showError(msg, "8 caractères minimum."); return; }
+      if (pw !== pw2) { showError(msg, "Les deux mots de passe ne correspondent pas."); return; }
       btn.disabled = true;
       btn.textContent = "…";
       const { error } = await client.auth.updateUser({ password: pw });
